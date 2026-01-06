@@ -84,7 +84,7 @@ argocd app sync cloudtrade-apps
 🔄 CI/CD Pipeline
 Workflow
 ```mermaid
-graph LR
+graph TD
     A[Code Push] --> B[Run Tests]
     B --> C[Build Docker Image]
     C --> D[Security Scan]

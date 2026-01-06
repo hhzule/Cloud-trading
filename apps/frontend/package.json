@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3009",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3009",
     "lint": "eslint",
         "test": "jest",
     "test:watch": "jest --watch"
@@ -14,7 +14,7 @@
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-        "lucide-react": "^0.294.0",
+    "lucide-react": "^0.294.0",
     "recharts": "^2.10.3"
   },
   "devDependencies": {

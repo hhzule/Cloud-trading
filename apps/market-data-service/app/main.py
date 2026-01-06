@@ -123,7 +123,9 @@ market_generator = MarketDataGenerator()
 async def lifespan(app: FastAPI):
     # Startup
     global redis_client
-    redis_host = os.getenv("REDIS_HOST", "redis")
+    # accessing docker
+    redis_host = os.getenv("REDIS_HOST", "localhost") 
+    # redis_host = os.getenv("REDIS_HOST", "redis")
     redis_port = int(os.getenv("REDIS_PORT", 6379))
     
     try:

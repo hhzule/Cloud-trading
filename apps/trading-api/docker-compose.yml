@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  api:
+    image: trading-api:test
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: trading
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: trading
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql      
+      #     Containers communicate via Docker internal DNS
+# DB_HOST=postgres resolves automatically
+# Exposing DB ports is not needed unless debugging
+# This mirrors Kubernetes ClusterIP behavior
+    # ports:
+    #   - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+#     Containers communicate via Docker internal DNS
+# DB_HOST=postgres resolves automatically
+# Exposing DB ports is not needed unless debugging
+# This mirrors Kubernetes ClusterIP behavior
+    # ports:
+    #   - "6379:6379"

@@ -1,4 +1,4 @@
-// apps/frontend/src/app/page.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -21,27 +21,27 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchMarkets();
-    const interval = setInterval(fetchMarkets, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect(() => {
+  //   fetchMarkets();
+  //   const interval = setInterval(fetchMarkets, 5000); // Refresh every 5 seconds
+  //   return () => clearInterval(interval);
+  // }, []);
 
-  const fetchMarkets = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_MARKET_DATA_API}/api/markets`
-      );
-      if (!response.ok) throw new Error('Failed to fetch market data');
-      const data = await response.json();
-      setMarkets(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const fetchMarkets = async () => {
+  //   try {
+  //     const response = await fetch(
+  //       `${process.env.NEXT_PUBLIC_MARKET_DATA_API}/api/markets`
+  //     );
+  //     if (!response.ok) throw new Error('Failed to fetch market data');
+  //     const data = await response.json();
+  //     setMarkets(data);
+  //     setError(null);
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'Unknown error');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -82,9 +82,9 @@ export default function Dashboard() {
 
           {!loading && !error && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {markets.map((market) => (
+              {/* {markets && markets.map((market) => (
                 <MarketDataCard key={market.symbol} data={market} />
-              ))}
+              ))} */}
             </div>
           )}
         </div>

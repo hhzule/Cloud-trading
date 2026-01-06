@@ -28,7 +28,7 @@ export default function PortfolioSummary() {
 
   const fetchPortfolio = async () => {
     try {
-      const userId = 'user-123'; // In production, get from auth
+      const userId = 'user1'; // In production, get from auth
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_TRADING_API}/api/portfolio/${userId}`
       );
@@ -140,4 +140,3 @@ export default function PortfolioSummary() {
     </div>
   );
 }
-

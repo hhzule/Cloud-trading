@@ -19,6 +19,7 @@ export default function TradeHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+
     fetchTrades();
     const interval = setInterval(fetchTrades, 15000);
     return () => clearInterval(interval);
@@ -32,6 +33,7 @@ export default function TradeHistory() {
       
       if (response.ok) {
         const data = await response.json();
+
         setTrades(data.trades || []);
       }
     } catch (error) {
@@ -129,10 +131,10 @@ export default function TradeHistory() {
                   {trade.quantity}
                 </td>
                 <td className="px-6 py-4 text-right text-sm text-white">
-                  ${trade.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${trade?.price?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </td>
                 <td className="px-6 py-4 text-right text-sm font-medium text-white">
-                  ${trade.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${trade?.total?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </td>
               </tr>
             ))}
@@ -140,11 +142,11 @@ export default function TradeHistory() {
         </table>
       </div>
 
-      {trades.length === 0 && (
+      {/* {trades.length === 0 && (
         <div className="text-center py-12">
           <p className="text-slate-400">No trades yet</p>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
