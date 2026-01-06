@@ -1,0 +1,50 @@
+
+# kubernetes/overlays/prod/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+- ../../base
+
+namespace: cloudtrade-prod
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+replicas:
+- name: trading-api
+  count: 5
+- name: frontend
+  count: 3
+
+patches:
+- target:
+    kind: HorizontalPodAutoscaler
+    name: trading-api-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 5
+    - op: replace
+      path: /spec/maxReplicas
+      value: 20
+
+# Resource quotas for production
+resources:
+- resource-quota.yaml
+- limit-range.yaml
+- network-policy.yaml
+
+configMapGenerator:
+- name: trading-api-config
+  behavior: merge
+  literals:
+  - LOG_LEVEL=warn
+  - NODE_ENV=production
+
+images:
+- name: trading-api
+  newTag: v1.2.3  # Specific version tag
+

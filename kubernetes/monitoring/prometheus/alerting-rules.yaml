@@ -1,0 +1,85 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-custom-rules
+  namespace: monitoring
+data:
+  custom-rules.yaml: |
+    groups:
+    - name: trading-api-alerts
+      interval: 30s
+      rules:
+      
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (service) 
+          / 
+          sum(rate(http_requests_total[5m])) by (service) 
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "{{ $labels.service }} has error rate of {{ $value }}%"
+      
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+          description: "{{ $labels.service }} P95 latency is {{ $value }}s"
+      
+      # Pod restart rate
+      - alert: PodRestartingFrequently
+        expr: |
+          rate(kube_pod_container_status_restarts_total[15m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod restarting frequently"
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} is restarting frequently"
+      
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (sum(container_memory_working_set_bytes{container!=""}) by (pod, namespace) 
+          / 
+          sum(container_spec_memory_limit_bytes{container!=""}) by (pod, namespace)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} using {{ $value }}% memory"
+      
+      # Database connection pool
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Database {{ $labels.datname }} using {{ $value }}% of connections"
+      
+      # Trade execution failures
+      - alert: TradeExecutionFailures
+        expr: |
+          sum(rate(trades_failed_total[5m])) by (reason) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High trade execution failure rate"
+          description: "{{ $value }} trades failing per second due to {{ $labels.reason }}"

@@ -1,0 +1,44 @@
+
+# kubernetes/overlays/dev/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+- ../../base
+
+namespace: cloudtrade-dev
+
+namePrefix: dev-
+
+commonLabels:
+  environment: dev
+
+replicas:
+- name: trading-api
+  count: 1
+- name: frontend
+  count: 1
+
+patches:
+- target:
+    kind: Deployment
+    name: trading-api
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: 128Mi
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 256Mi
+
+configMapGenerator:
+- name: trading-api-config
+  behavior: merge
+  literals:
+  - LOG_LEVEL=debug
+  - NODE_ENV=development
+
+images:
+- name: trading-api
+  newTag: dev-latest
+

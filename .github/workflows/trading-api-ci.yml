@@ -1,0 +1,221 @@
+# .github/workflows/trading-api-ci.yml
+name: Trading API CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+    - 'apps/trading-api/**'
+    - '.github/workflows/trading-api-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+    - 'apps/trading-api/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/trading-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trading_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+        - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+        - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: apps/trading-api/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: apps/trading-api
+      run: npm ci
+    
+    - name: Run linter
+      working-directory: apps/trading-api
+      run: npm run lint
+    
+    - name: Run unit tests
+      working-directory: apps/trading-api
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: trading_test
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        REDIS_HOST: localhost
+      run: npm test -- --coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: apps/trading-api/coverage/lcov.info
+        flags: trading-api
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'apps/trading-api'
+        severity: 'CRITICAL,HIGH'
+        exit-code: '1'
+    
+    - name: Run npm audit
+      working-directory: apps/trading-api
+      run: npm audit --audit-level=moderate
+
+  build-and-push:
+    needs: [test, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: apps/trading-api
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+    
+    - name: Sign image with Cosign
+      uses: sigstore/cosign-installer@main
+    
+    - name: Sign the published Docker image
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+      run: |
+        cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.meta.outputs.digest }}
+
+  deploy-dev:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Update image tag in GitOps repo
+      env:
+        GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+      run: |
+        git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
+        cd ${{ github.repository }}-gitops
+        
+        # Update kustomization with new image tag
+        cd overlays/dev
+        kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add .
+        git commit -m "Update trading-api to ${{ github.sha }}"
+        git push
+
+  deploy-prod:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://cloudtrade.example.com
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create release tag
+      id: tag
+      run: |
+        VERSION=$(date +%Y%m%d)-${GITHUB_SHA::7}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        git tag $VERSION
+        git push origin $VERSION
+    
+    - name: Update image tag for production
+      env:
+        GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+      run: |
+        git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
+        cd ${{ github.repository }}-gitops
+        
+        cd overlays/prod
+        kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.version }}
+        
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add .
+        git commit -m "Deploy trading-api ${{ steps.tag.outputs.version }} to production"
+        git push
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.version }}
+        generate_release_notes: true

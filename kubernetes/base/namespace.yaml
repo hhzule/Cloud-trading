@@ -1,0 +1,25 @@
+
+# kubernetes/base/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudtrade
+  labels:
+    name: cloudtrade
+    istio-injection: enabled  # If using service mesh
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cache
+  labels:
+    name: cache
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+  labels:
+    name: database

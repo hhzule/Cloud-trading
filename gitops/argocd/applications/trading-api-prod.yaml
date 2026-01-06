@@ -1,0 +1,33 @@
+
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trading-api-prod
+  namespace: argocd
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: alerts
+spec:
+  project: production
+  
+  source:
+    repoURL: https://github.com/your-org/cloudtrade-platform.git
+    targetRevision: main
+    path: kubernetes/overlays/prod
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudtrade-prod
+  
+  syncPolicy:
+    automated:
+      prune: false  # Manual pruning in prod
+      selfHeal: false  # Manual healing in prod
+    
+    syncOptions:
+    - CreateNamespace=true
+  
+  # Sync waves for controlled rollout
+  syncPolicy:
+    syncOptions:
+    - RespectIgnoreDifferences=true

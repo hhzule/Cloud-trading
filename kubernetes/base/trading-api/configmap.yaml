@@ -1,0 +1,15 @@
+# kubernetes/base/trading-api/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trading-api-config
+  labels:
+    app: trading-api
+data:
+  DB_HOST: "postgres.database.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "trading"
+  REDIS_HOST: "redis.cache.svc.cluster.local"
+  LOG_LEVEL: "info"
+  NODE_ENV: "production"
+

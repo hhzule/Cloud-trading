@@ -1,0 +1,38 @@
+# kubernetes/base/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloudtrade
+
+resources:
+- namespace.yaml
+- frontend/deployment.yaml
+- frontend/service.yaml
+- frontend/hpa.yaml
+- trading-api/deployment.yaml
+- trading-api/service.yaml
+- trading-api/hpa.yaml
+- trading-api/configmap.yaml
+- trading-api/secret.yaml
+- trading-api/serviceaccount.yaml
+- market-data/deployment.yaml
+- market-data/service.yaml
+- redis/deployment.yaml
+- redis/service.yaml
+- ingress.yaml
+
+commonLabels:
+  project: cloudtrade
+  managed-by: kustomize
+
+images:
+- name: frontend
+  newName: your-registry/cloudtrade-frontend
+  newTag: latest
+- name: trading-api
+  newName: your-registry/cloudtrade-trading-api
+  newTag: latest
+- name: market-data
+  newName: your-registry/cloudtrade-market-data
+  newTag: latest
+
