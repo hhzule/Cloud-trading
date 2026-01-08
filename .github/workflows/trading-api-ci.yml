@@ -1,4 +1,4 @@
-# .github/workflows/trading-api-ci.yml
+
 name: Trading API CI/CD
 
 on:
@@ -12,9 +12,9 @@ on:
     paths:
     - 'apps/trading-api/**'
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/trading-api
+# env:
+#   REGISTRY: ghcr.io
+#   IMAGE_NAME: ${{ github.repository }}/trading-api
 
 jobs:
   test:
@@ -98,7 +98,7 @@ jobs:
       working-directory: apps/trading-api
       run: npm audit --audit-level=moderate
 
-  build-and-push:
+  docker-build:
     needs: [test, security-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
@@ -110,112 +110,118 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: apps/trading-api
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        platforms: linux/amd64,linux/arm64
-    
-    - name: Sign image with Cosign
-      uses: sigstore/cosign-installer@main
-    
-    - name: Sign the published Docker image
-      env:
-        COSIGN_EXPERIMENTAL: "true"
-      run: |
-        cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.meta.outputs.digest }}
 
-  deploy-dev:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Update image tag in GitOps repo
-      env:
-        GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+    - name: Build image  
       run: |
-        git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
-        cd ${{ github.repository }}-gitops
-        
-        # Update kustomization with new image tag
-        cd overlays/dev
-        kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-        
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add .
-        git commit -m "Update trading-api to ${{ github.sha }}"
-        git push
+        docker build \
+          -t trading-api-local:latest \
+          apps/trading-api      
+    
+    # - name: Set up Docker Buildx
+    #   uses: docker/setup-buildx-action@v3
+    
+    # - name: Log in to Container Registry
+    #   uses: docker/login-action@v3
+    #   with:
+    #     registry: ${{ env.REGISTRY }}
+    #     username: ${{ github.actor }}
+    #     password: ${{ secrets.GITHUB_TOKEN }}
+    
+    # - name: Extract metadata
+    #   id: meta
+    #   uses: docker/metadata-action@v5
+    #   with:
+    #     images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    #     tags: |
+    #       type=ref,event=branch
+    #       type=sha,prefix={{branch}}-
+    #       type=semver,pattern={{version}}
+    #       type=semver,pattern={{major}}.{{minor}}
+    
+    # - name: Build and push Docker image
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: apps/trading-api
+    #     push: true
+    #     tags: ${{ steps.meta.outputs.tags }}
+    #     labels: ${{ steps.meta.outputs.labels }}
+    #     cache-from: type=gha
+    #     cache-to: type=gha,mode=max
+    #     platforms: linux/amd64,linux/arm64
+    
+    # - name: Sign image with Cosign
+    #   uses: sigstore/cosign-installer@main
+    
+    # - name: Sign the published Docker image
+    #   env:
+    #     COSIGN_EXPERIMENTAL: "true"
+    #   run: |
+    #     cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.meta.outputs.digest }}
 
-  deploy-prod:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://cloudtrade.example.com
+  # deploy-dev:
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/develop'
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
     
-    - name: Create release tag
-      id: tag
-      run: |
-        VERSION=$(date +%Y%m%d)-${GITHUB_SHA::7}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        git tag $VERSION
-        git push origin $VERSION
-    
-    - name: Update image tag for production
-      env:
-        GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-      run: |
-        git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
-        cd ${{ github.repository }}-gitops
+  #   - name: Update image tag in GitOps repo
+  #     env:
+  #       GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+  #     run: |
+  #       git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
+  #       cd ${{ github.repository }}-gitops
         
-        cd overlays/prod
-        kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.version }}
+  #       # Update kustomization with new image tag
+  #       cd overlays/dev
+  #       kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add .
-        git commit -m "Deploy trading-api ${{ steps.tag.outputs.version }} to production"
-        git push
+  #       git config user.name "GitHub Actions"
+  #       git config user.email "actions@github.com"
+  #       git add .
+  #       git commit -m "Update trading-api to ${{ github.sha }}"
+  #       git push
+
+  # deploy-prod:
+    # needs: build-and-push
+    # runs-on: ubuntu-latest
+    # if: github.ref == 'refs/heads/main'
+    # environment:
+    #   name: production
+    #   url: https://cloudtrade.example.com
     
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.tag.outputs.version }}
-        generate_release_notes: true
+    # steps:
+    # - name: Checkout code
+    #   uses: actions/checkout@v4
+    
+    # - name: Create release tag
+    #   id: tag
+    #   run: |
+    #     VERSION=$(date +%Y%m%d)-${GITHUB_SHA::7}
+    #     echo "version=$VERSION" >> $GITHUB_OUTPUT
+    #     git tag $VERSION
+    #     git push origin $VERSION
+    
+    # - name: Update image tag for production
+    #   env:
+    #     GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+    #   run: |
+    #     git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
+    #     cd ${{ github.repository }}-gitops
+        
+    #     cd overlays/prod
+    #     kustomize edit set image trading-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.version }}
+        
+    #     git config user.name "GitHub Actions"
+    #     git config user.email "actions@github.com"
+    #     git add .
+    #     git commit -m "Deploy trading-api ${{ steps.tag.outputs.version }} to production"
+    #     git push
+    
+    # - name: Create GitHub Release
+    #   uses: softprops/action-gh-release@v1
+    #   with:
+    #     tag_name: ${{ steps.tag.outputs.version }}
+    #     generate_release_notes: true

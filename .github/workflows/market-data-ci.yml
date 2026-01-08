@@ -12,10 +12,6 @@ on:
     paths:
     - 'apps/market-data-service/**'
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/market-data-service
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -90,7 +86,7 @@ jobs:
         pip install safety
         safety check -r requirements.txt
 
-  build-and-push:
+  docker-build:
     needs: [test, security-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
@@ -102,58 +98,64 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=semver,pattern={{version}}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: apps/market-data-service
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
-  deploy-dev:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Update GitOps repo
-      env:
-        GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+    - name: Build image  
       run: |
-        git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
-        cd ${{ github.repository }}-gitops
+        docker build \
+          -t market-data-api-local:latest \
+          apps/market-data-service      
+    
+  #   - name: Set up Docker Buildx
+  #     uses: docker/setup-buildx-action@v3
+    
+  #   - name: Log in to Container Registry
+  #     uses: docker/login-action@v3
+  #     with:
+  #       registry: ${{ env.REGISTRY }}
+  #       username: ${{ github.actor }}
+  #       password: ${{ secrets.GITHUB_TOKEN }}
+    
+  #   - name: Extract metadata
+  #     id: meta
+  #     uses: docker/metadata-action@v5
+  #     with:
+  #       images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+  #       tags: |
+  #         type=ref,event=branch
+  #         type=sha,prefix={{branch}}-
+  #         type=semver,pattern={{version}}
+    
+  #   - name: Build and push Docker image
+  #     uses: docker/build-push-action@v5
+  #     with:
+  #       context: apps/market-data-service
+  #       push: true
+  #       tags: ${{ steps.meta.outputs.tags }}
+  #       labels: ${{ steps.meta.outputs.labels }}
+  #       cache-from: type=gha
+  #       cache-to: type=gha,mode=max
+
+  # deploy-dev:
+    # needs: build-and-push
+    # runs-on: ubuntu-latest
+    # if: github.ref == 'refs/heads/develop'
+    
+    # steps:
+    # - name: Checkout code
+    #   uses: actions/checkout@v4
+    
+    # - name: Update GitOps repo
+    #   env:
+    #     GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+    #   run: |
+    #     git clone https://oauth2:$GITOPS_TOKEN@github.com/${{ github.repository }}-gitops.git
+    #     cd ${{ github.repository }}-gitops
         
-        cd overlays/dev
-        kustomize edit set image market-data-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+    #     cd overlays/dev
+    #     kustomize edit set image market-data-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add .
-        git commit -m "Update market-data to ${{ github.sha }}"
-        git push
+    #     git config user.name "GitHub Actions"
+    #     git config user.email "actions@github.com"
+    #     git add .
+    #     git commit -m "Update market-data to ${{ github.sha }}"
+    #     git push
